@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """
-Read Damage Control — pre_tool_use hook
-Blokkeert Read op zero_access_paths (secrets, keys, etc.)
+Read Damage Control — pre_tool_use hook for Claude Code
+Blocks reading of secrets, keys, and other sensitive files
 """
 import json
 import sys
@@ -14,7 +14,7 @@ def load_patterns():
         with open(patterns_path) as f:
             return yaml.safe_load(f)
     except (FileNotFoundError, yaml.YAMLError):
-        print(json.dumps({"decision": "block", "reason": "patterns.yaml ontbreekt of is corrupt"}))
+        print(json.dumps({"decision": "block", "reason": "patterns.yaml missing or corrupt"}))
         sys.exit(2)
 
 def main():
@@ -36,7 +36,7 @@ def main():
         if path in file_path:
             print(json.dumps({
                 "decision": "block",
-                "reason": f"Zero-access: '{path}' mag niet gelezen worden. Bevat mogelijk secrets."
+                "reason": f"Zero-access: '{path}' cannot be read. May contain secrets."
             }))
             sys.exit(2)
 

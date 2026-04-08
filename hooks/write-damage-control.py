@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """
-Write/Edit Damage Control v2 — pre_tool_use hook
-Fixes: no_delete_paths check bij Write (voorkomt overschrijven als delete)
+Write/Edit Damage Control v2 — pre_tool_use hook for Claude Code
+Protects secrets, read-only files, and guards against empty-content overwrites
 """
 import json
 import sys
@@ -14,7 +14,7 @@ def load_patterns():
         with open(patterns_path) as f:
             return yaml.safe_load(f)
     except (FileNotFoundError, yaml.YAMLError):
-        print(json.dumps({"decision": "block", "reason": "patterns.yaml ontbreekt of is corrupt — alles geblokkeerd voor veiligheid"}))
+        print(json.dumps({"decision": "block", "reason": "patterns.yaml missing or corrupt — blocking all writes for safety"}))
         sys.exit(2)
 
 def main():
@@ -38,7 +38,7 @@ def main():
         if path in file_path:
             print(json.dumps({
                 "decision": "block",
-                "reason": f"Zero-access: '{path}' mag niet geschreven worden. Bevat mogelijk secrets."
+                "reason": f"Zero-access: '{path}' cannot be written. May contain secrets."
             }))
             sys.exit(2)
 
@@ -47,7 +47,7 @@ def main():
         if path in file_path:
             print(json.dumps({
                 "decision": "block",
-                "reason": f"Read-only: '{file_path}' is beschermd. Vraag de gebruiker om dit handmatig te wijzigen."
+                "reason": f"Read-only: '{file_path}' is protected. Ask the user to modify this manually."
             }))
             sys.exit(2)
 
@@ -59,7 +59,7 @@ def main():
             if len(content.strip()) < 10:
                 print(json.dumps({
                     "decision": "ask",
-                    "reason": f"Beschermd bestand '{file_path}' wordt overschreven met minimale content ({len(content)} chars). Klopt dit?"
+                    "reason": f"Protected file '{file_path}' is being overwritten with minimal content ({len(content)} chars). Is this correct?"
                 }))
             break
 
