@@ -1,0 +1,63 @@
+# Damage Control Patterns
+# Configure per project — add paths and commands relevant to YOUR setup
+
+blocked_commands:
+  # Destructive file operations
+  - "rm -rf /"
+  - "rm -rf /*"
+  - "rm -rf ~"
+  - "rm -rf ."
+  - "rm -rf .."
+  - "rm -rf .git"
+  - "> /dev/sda"
+  - "mkfs"
+  - "dd if="
+  - ":(){ :|:& };:"
+
+  # Destructive git operations
+  - "git push --force"
+  - "git push -f"
+  - "git reset --hard"
+  - "git clean -fd"
+  - "git checkout -- ."
+
+  # Dangerous system commands
+  - "chmod -R 777"
+  - "chown -R"
+  - "kill -9"
+  - "killall"
+  - "pkill"
+  - "shutdown"
+  - "reboot"
+
+ask_commands:
+  # Deploy operations — require confirmation
+  - "pm2 restart"
+  - "npm run build"
+  - "docker compose down"
+
+  # Env/secret related — require confirmation
+  - ".env"
+  - "credentials"
+  - "secret"
+  - "token"
+  - "api_key"
+  - "API_KEY"
+
+zero_access_paths:
+  # Files that should NEVER be read or written by AI
+  - ".env"
+  - ".env.local"
+  - ".env.production"
+  - ".ssh"
+  - "credentials.json"
+  - "id_rsa"
+
+read_only_paths:
+  # Files that should not be modified by AI
+  - ".claude/hooks/"
+
+no_delete_paths:
+  # Files/dirs that should never be deleted or overwritten with empty content
+  - ".claude/"
+  - "CLAUDE.md"
