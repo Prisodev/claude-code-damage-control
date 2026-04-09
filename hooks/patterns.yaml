@@ -11,24 +11,18 @@ blocked_commands:
   - "rm -rf .git"
   - "> /dev/sda"
   - "mkfs"
-  - "dd if="
   - ":(){ :|:& };:"
 
   # Destructive git operations
-  - "git push --force"
-  - "git push -f"
+  # Note: "git push --force" intentionally does NOT match "--force-with-lease" (see regex)
+  - "git push -f "
   - "git reset --hard"
   - "git clean -fd"
   - "git checkout -- ."
 
-  # Dangerous system commands
-  - "chmod -R 777"
-  - "chown -R"
-  - "kill -9"
-  - "killall"
-  - "pkill"
-  - "shutdown"
-  - "reboot"
+  # Dangerous system commands (use word-boundary regex below for these)
+  # Moved: shutdown, reboot, pkill, killall, kill -9, chmod 777, chown -R, dd
+  # to DESTRUCTIVE_REGEXES in bash-damage-control.py for word-boundary matching
 
 ask_commands:
   # Deploy operations — require confirmation
@@ -42,16 +36,16 @@ ask_commands:
   - "secret"
   - "token"
   - "api_key"
-  - "API_KEY"
 
 zero_access_paths:
   # Files that should NEVER be read or written by AI
+  # Note: uses substring matching, so ".env" matches ".env.local" etc.
+  # Exception: ".env.example" is explicitly allowed (see hooks)
   - ".env"
-  - ".env.local"
-  - ".env.production"
   - ".ssh"
   - "credentials.json"
   - "id_rsa"
+  - "id_ed25519"
 
 read_only_paths:
   # Files that should not be modified by AI
