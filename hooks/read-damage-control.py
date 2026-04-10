@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
 """
-Read Damage Control v2 — pre_tool_use hook for Claude Code
+Read Damage Control v3 — pre_tool_use hook for Claude Code
 Blocks reading of secrets, keys, and other sensitive files.
-Also intercepts Grep tool to prevent searching through sensitive paths.
+Also intercepts Grep and Glob tools to prevent searching through sensitive paths.
 """
 import json
 import sys
@@ -80,6 +80,38 @@ def main():
                 print(json.dumps({
                     "decision": "block",
                     "reason": f"Zero-access: cannot search '{glob_pattern}'. May match secrets."
+                }))
+                sys.exit(2)
+
+    # Handle Glob tool — check the search pattern and path
+    elif tool_name == "Glob":
+        tool_input = input_data.get("tool_input", {})
+        glob_pattern = tool_input.get("pattern", "")
+        search_path = tool_input.get("path", "")
+
+        if not glob_pattern and not search_path:
+            sys.exit(0)
+
+        patterns = load_patterns()
+
+        for path in patterns.get("zero_access_paths", []):
+            # Check if glob pattern targets sensitive files
+            if glob_pattern and path in glob_pattern:
+                if path == ".env" and ".env.example" in glob_pattern:
+                    continue
+                print(json.dumps({
+                    "decision": "block",
+                    "reason": f"Zero-access: cannot glob for '{glob_pattern}'. May reveal secrets."
+                }))
+                sys.exit(2)
+
+            # Check if search path targets sensitive directory
+            if search_path and path in search_path:
+                if path == ".env" and ".env.example" in search_path:
+                    continue
+                print(json.dumps({
+                    "decision": "block",
+                    "reason": f"Zero-access: cannot glob in '{search_path}'. May contain secrets."
                 }))
                 sys.exit(2)
 

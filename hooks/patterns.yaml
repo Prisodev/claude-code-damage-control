@@ -2,27 +2,13 @@
 # Configure per project — add paths and commands relevant to YOUR setup
 
 blocked_commands:
-  # Destructive file operations
-  - "rm -rf /"
-  - "rm -rf /*"
-  - "rm -rf ~"
-  - "rm -rf ."
-  - "rm -rf .."
-  - "rm -rf .git"
+  # Only commands NOT covered by DESTRUCTIVE_REGEXES in bash-damage-control.py
+  # All rm -rf, git push --force/-f, git reset --hard, git clean are handled by regex
+  # (regex avoids false positives from substring matching)
   - "> /dev/sda"
   - "mkfs"
   - ":(){ :|:& };:"
-
-  # Destructive git operations
-  # Note: "git push --force" intentionally does NOT match "--force-with-lease" (see regex)
-  - "git push -f "
-  - "git reset --hard"
-  - "git clean -fd"
   - "git checkout -- ."
-
-  # Dangerous system commands (use word-boundary regex below for these)
-  # Moved: shutdown, reboot, pkill, killall, kill -9, chmod 777, chown -R, dd
-  # to DESTRUCTIVE_REGEXES in bash-damage-control.py for word-boundary matching
 
 ask_commands:
   # Deploy operations — require confirmation

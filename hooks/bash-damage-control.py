@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """
-Bash Damage Control v3 — pre_tool_use hook for Claude Code
-Blocks destructive commands, catches regex variants, requires confirmation for sensitive ops
+Bash Damage Control v4 — pre_tool_use hook for Claude Code
+Blocks destructive commands, catches regex variants, detects exfiltration, requires confirmation for sensitive ops
 """
 import json
 import sys
@@ -30,6 +30,8 @@ DESTRUCTIVE_REGEXES = [
     (r'\bfind\b.*-delete\b', "find -delete"),
     # git push --force but NOT --force-with-lease (which is the safe alternative)
     (r'\bgit\s+push\b.*--force(?!-with-lease)\b', "git push --force variant"),
+    # git push -f (short flag) — also exclude -force-with-lease context
+    (r'\bgit\s+push\b.*\s-f\b', "git push -f variant"),
     (r'\bgit\s+reset\b.*--hard', "git reset --hard variant"),
     (r'\bgit\s+clean\b.*-[a-zA-Z]*f', "git clean -f variant"),
     # System commands with word boundaries to avoid matching in filenames
@@ -41,6 +43,27 @@ DESTRUCTIVE_REGEXES = [
     (r'\bshutdown(\s|$)', "shutdown command"),
     (r'\breboot(\s|$)', "reboot command"),
     (r'\bdd\b\s+.*\b(if|of)=', "dd command"),
+    # mv on critical system paths
+    (r'\bmv\s+/(etc|var|usr|boot|bin|sbin|lib)\b', "mv on system path"),
+    (r'\bmv\s+.*\s+/dev/null\b', "mv to /dev/null (destructive)"),
+]
+
+# Exfiltration patterns — detect piping/sending secrets to network tools
+EXFILTRATION_REGEXES = [
+    # Direct network access to secret files
+    (r'\b(curl|wget)\b.*(-d\s+@|-F\s+.*=@).*\.(env|pem|key)\b', "exfiltration: uploading secret file via curl/wget"),
+    # Piping secrets to network tools
+    (r'\.env\b.*\|\s*(curl|wget|nc|ncat|netcat)\b', "exfiltration: piping .env to network tool"),
+    (r'\b(cat|head|tail|less|more)\b.*\.(env|pem|key|ssh)\b.*\|\s*(curl|wget|nc|ncat|netcat|scp)\b', "exfiltration: piping secret to network"),
+    # Environment variable dumping to network
+    (r'\benv\b.*\|\s*(curl|wget|nc|ncat|netcat)\b', "exfiltration: piping env vars to network tool"),
+    (r'\bprintenv\b.*\|\s*(curl|wget|nc|ncat|netcat)\b', "exfiltration: piping env vars to network tool"),
+    # scp/rsync of secret files
+    (r'\b(scp|rsync)\b.*\.(env|pem|key)\b.*@', "exfiltration: copying secrets to remote host"),
+    # DNS exfiltration (encoding data in DNS queries)
+    (r'\b(dig|nslookup|host)\b.*\$\(', "exfiltration: command substitution in DNS query"),
+    # base64 encoding + network (common exfil pattern)
+    (r'\bbase64\b.*\|\s*(curl|wget|nc)\b', "exfiltration: base64 encoding to network"),
 ]
 
 # Commands that read file contents — used to protect sensitive paths via bash
@@ -59,6 +82,11 @@ def check_command(command: str, patterns: dict) -> tuple[str, str]:
 
     # Check destructive regex patterns
     for regex, label in DESTRUCTIVE_REGEXES:
+        if re.search(regex, command, re.IGNORECASE):
+            return "block", f"Blocked: '{label}' detected"
+
+    # Check exfiltration patterns
+    for regex, label in EXFILTRATION_REGEXES:
         if re.search(regex, command, re.IGNORECASE):
             return "block", f"Blocked: '{label}' detected"
 
@@ -90,8 +118,8 @@ def check_paths(command: str, patterns: dict) -> tuple[str, str]:
             if path in command:
                 return "block", f"Zero-access path: cannot read '{path}' via shell command"
 
-    # Check no-delete paths for ANY destructive file operation
-    destructive_ops = ["rm ", "rm\t", "unlink ", "truncate ", "shred "]
+    # Check no-delete paths for ANY destructive file operation (including mv)
+    destructive_ops = ["rm ", "rm\t", "unlink ", "truncate ", "shred ", "mv "]
     if any(op in command.lower() for op in destructive_ops):
         for path in patterns.get("no_delete_paths", []):
             if path in command:
